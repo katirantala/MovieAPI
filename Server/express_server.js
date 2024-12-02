@@ -1,11 +1,31 @@
 import express from 'express';
+import pg from 'pg';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const pgPool = new pg.Pool({
+    host: process.env.PG_HOST,
+    port: process.env.PG_PORT,
+    database: process.env.PG_DATABASE,
+    user: process.env.PG_USER,
+    password: process.env.PG_PW
+});
+
+export {pgPool};
 
 var app = express(); 
 
 // Middleware
 app.use(express.json());
 
+//Database connection testing
+pgPool.connect()
+.then(() => console.log('Connected to the database'))
+.catch((err) => console.error('Database connection error:', err.stack));
+
+
 // Server
+
 app.listen(3001, () => {
     console.log('The server is running')
 });
@@ -13,15 +33,20 @@ app.listen(3001, () => {
 // ENDPOINTS
 
 // Add genre
-app.post('/genres', (req, res) => {
+app.post('/genres', async (req, res) => {
     const { name } = req.body;
     if (!name) {
         return res.status(400).json({ error: 'Genre name is required' });
     }
-
-    // Lisää genren logiikka tähän 
-    res.status(201).json({ message: `Genre '${name}' added successfully` });
+    try {
+        const result = await pgPool.query("INSERT INTO genres (name) VALUES ('horror')");
+        res.status(201).json({ message: `Genre added successfully` });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to add genre' });
+    }
 });
+
 
 
 // Add movie 
