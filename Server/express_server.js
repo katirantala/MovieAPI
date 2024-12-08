@@ -1,33 +1,17 @@
 import express from 'express';
-import pg from 'pg';
+import pgPool from './pgPool.js';
 import dotenv from 'dotenv';
+
 dotenv.config();
 
-const pgPool = new pg.Pool({
-    host: process.env.PG_HOST,
-    port: process.env.PG_PORT,
-    database: process.env.PG_DATABASE,
-    user: process.env.PG_USER,
-    password: process.env.PG_PW
-});
-
-export {pgPool};
-
-var app = express(); 
+var app = express();
 
 // Middleware
 app.use(express.json());
 
-//Database connection testing
-pgPool.connect()
-.then(() => console.log('Connected to the database'))
-.catch((err) => console.error('Database connection error:', err.stack));
-
-
 // Server
-
 app.listen(3001, () => {
-    console.log('The server is running')
+    console.log('The server is running');
 });
 
 // ENDPOINTS
@@ -39,15 +23,13 @@ app.post('/genres', async (req, res) => {
         return res.status(400).json({ error: 'Genre name is required' });
     }
     try {
-        const result = await pgPool.query("INSERT INTO genres (name) VALUES ('horror')");
-        res.status(201).json({ message: `Genre added successfully` });
+        const result = await pgPool.query("INSERT INTO genres (name) VALUES ($1) RETURNING *", [name]);
+        res.status(201).json({ message: `Genre '${result.rows[0].name}' added successfully` });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to add genre' });
     }
 });
-
-
 
 // Add movie 
 app.post('/movies', (req, res) => {
@@ -60,7 +42,6 @@ app.post('/movies', (req, res) => {
     res.status(201).json({ message: `Movie '${name}' added successfully` });
 });
 
-
 // Add registering user
 app.post('/users', (req, res) => {
     const { name, username, password, yearOfBirth } = req.body;
@@ -69,10 +50,9 @@ app.post('/users', (req, res) => {
         return res.status(400).json({ error: 'All user fields are required' });
     }
 
-      // Lisää käyttäjän rekisteröinnin logiikka tähän
+    // Lisää käyttäjän rekisteröinnin logiikka tähän
     res.status(201).json({ message: `User '${username}' registered successfully` });
-    });
-
+});
 
 // Add movie review
 app.post('/reviews', (req, res) => {
@@ -104,7 +84,6 @@ app.get('/movies', (req, res) => {
     res.status(200).json({ message: 'All movies fetched' });
 });
 
-
 // Get movies by keyword
 app.get('/movies/search', (req, res) => {
     const { keyword } = req.query;
@@ -117,14 +96,13 @@ app.get('/movies/search', (req, res) => {
     res.status(200).json({ message: `Movies matching keyword '${keyword}' fetched` });
 });
 
-
 // Get favorite movies by username
 app.get('/favorites/:username', (req, res) => {
     const { username } = req.params;
 
-     // Hae käyttäjän suosikit logiikka tähän
-     res.status(200).json({ message: `Favorites for user '${username}' fetched` });
-    });
+    // Hae käyttäjän suosikit logiikka tähän
+    res.status(200).json({ message: `Favorites for user '${username}' fetched` });
+});
 
 // Get movie by id
 app.get('/movies/:id', (req, res) => {
