@@ -67,7 +67,7 @@ INSERT INTO movies (name, year, genre_id) VALUES ('The Lion King', 1994, 5);
 
 INSERT INTO viewers (name, user_name, password, year_of_birth) VALUES ('John Doe', 'johndoe', 'password123', 1990);
 INSERT INTO viewers (name, user_name, password, year_of_birth) VALUES ('Lisa Simpson', 'lisaaa', 'password456', 2004);
-INSERT INTO viewers (name, user_name, password, year_of_birth) VALUES ('Donald Duck', 'duckduck', 'passwor789', 1995);
+INSERT INTO viewers (name, user_name, password, year_of_birth) VALUES ('Donald Duck', 'duckduck', 'password789', 1995);
 
 
 INSERT INTO reviews (movie_id, viewer_id, review_text, stars) VALUES (1, 1, 'Amazing movie!', 5);
