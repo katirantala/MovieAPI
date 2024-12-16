@@ -35,7 +35,7 @@ CREATE TABLE reviews (
     FOREIGN KEY (viewer_id) REFERENCES viewers (id)
     )
 
-CREATE TABLE favourites (
+CREATE TABLE favorites (
     id INT GENERATED ALWAYS AS IDENTITY,
     movie_id INT,
     viewer_id INT,
@@ -74,7 +74,7 @@ INSERT INTO reviews (movie_id, viewer_id, review_text, stars) VALUES (1, 1, 'Ama
 INSERT INTO reviews (movie_id, viewer_id, review_text, stars) VALUES (9, 2, 'Lovely movie!', 4);
 
 
-INSERT INTO favourites (movie_id, viewer_id) VALUES (1, 1);
-INSERT INTO favourites (movie_id, viewer_id) VALUES (3, 2);
+INSERT INTO favorites (movie_id, viewer_id) VALUES (1, 1);
+INSERT INTO favorites (movie_id, viewer_id) VALUES (3, 2);
 
 
