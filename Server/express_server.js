@@ -23,8 +23,11 @@ app.post('/genres', async (req, res) => {
         return res.status(400).json({ error: 'Genre name is required' });
     }
     try {
-        const result = await pgPool.query("INSERT INTO genres (name) VALUES ($1) RETURNING *", [name]);
-        res.status(201).json({ message: `Genre '${result.rows[0].name}' added successfully` });
+        const result = await pgPool.query(
+            "INSERT INTO genres (genre_name) VALUES ($1) RETURNING *",
+            [name]
+        );
+        res.status(201).json({ message: `Genre '${result.rows[0].genre_name}' added successfully` });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to add genre' });
@@ -32,90 +35,176 @@ app.post('/genres', async (req, res) => {
 });
 
 // Add movie 
-app.post('/movies', (req, res) => {
-    const { name, year, genre } = req.body;
-    if (!name || !year || !genre) {
-        return res.status(400).json({ error: 'Name, year, and genre are required' });
+app.post('/movies', async (req, res) => {
+    const { name, year, genre_name } = req.body;
+    if (!name || !year || !genre_name) {
+        return res.status(400).json({ error: 'Name, year, and genre_name are required' });
     }
+    try {
+        const genreResult = await pgPool.query(
+            "SELECT id FROM genres WHERE genre_name = $1",
+            [genre_name]
+        );
+        if (genreResult.rows.length === 0) {
+            return res.status(400).json({ error: `Genre '${genre_name}' not found` });
+        }
+        const genreId = genreResult.rows[0].id;
 
-    // Lisää elokuvan logiikka tähän
-    res.status(201).json({ message: `Movie '${name}' added successfully` });
+        const query = "INSERT INTO movies (name, year, genre_id) VALUES ($1, $2, $3) RETURNING *";
+        const result = await pgPool.query(query, [name, year, genreId]);
+
+        const addedMovie = result.rows[0];
+
+        res.status(201).json({
+            message: `Movie '${addedMovie.name}' added successfully`,
+            movie: {
+                id: addedMovie.id,
+                name: addedMovie.name,
+                year: addedMovie.year,
+                genre_name,
+            },
+        });
+    } catch (error) {
+        console.error('Error adding movie:', error);
+        res.status(500).json({ error: 'Failed to add movie' });
+    }
 });
 
 // Add registering user
-app.post('/users', (req, res) => {
+app.post('/users', async (req, res) => {
     const { name, username, password, yearOfBirth } = req.body;
-
     if (!name || !username || !password || !yearOfBirth) {
         return res.status(400).json({ error: 'All user fields are required' });
     }
-
-    // Lisää käyttäjän rekisteröinnin logiikka tähän
-    res.status(201).json({ message: `User '${username}' registered successfully` });
+    try {
+        const userCheck = await pgPool.query(
+            "SELECT id FROM viewers WHERE user_name = $1",
+            [username]
+        );
+        if (userCheck.rows.length > 0) {
+            return res.status(400).json({ error: 'Username already exists' });
+        }
+        const result = await pgPool.query(
+            `INSERT INTO viewers (name, user_name, password, year_of_birth) 
+            VALUES ($1, $2, $3, $4) RETURNING *`,
+            [name, username, password, yearOfBirth]
+        );
+        const { password: _, ...user } = result.rows[0];
+        res.status(201).json({
+            message: `User '${username}' registered successfully`,
+            user
+        });
+    } catch (error) {
+        console.error('Error registering user:', error);
+        res.status(500).json({ error: 'Failed to register user' });
+    }
 });
 
 // Add movie review
-app.post('/reviews', (req, res) => {
-    const { username, stars, reviewText, movieId } = req.body;
-
-    if (!username || !stars || !reviewText || !movieId) {
+app.post('/reviews', async (req, res) => {
+    const { viewerId, stars, reviewText, movieId } = req.body;
+    if (!viewerId || !stars || !reviewText || !movieId) {
         return res.status(400).json({ error: 'All review fields are required' });
     }
-
-    // Lisää arvostelun logiikka tähän
-    res.status(201).json({ message: `Review added for movie ID: ${movieId}` });
-});
-
-// Add favorite movies for user
-app.post('/favorites', (req, res) => {
-    const { username, movieId } = req.body;
-
-    if (!username || !movieId) {
-        return res.status(400).json({ error: 'Username and movie ID are required' });
+    if (isNaN(stars) || stars < 1 || stars > 5) {
+        return res.status(400).json({ error: 'Stars must be a number between 1 and 5' });
     }
-
-    // Lisää suosikkielokuvan logiikka tähän
-    res.status(201).json({ message: `Movie ID: ${movieId} added to ${username}'s favorites` });
-});
-
-// Get all movies
-app.get('/movies', (req, res) => {
-    // Hae kaikki elokuvat logiikka tähän
-    res.status(200).json({ message: 'All movies fetched' });
-});
-
-// Get movies by keyword
-app.get('/movies/search', (req, res) => {
-    const { keyword } = req.query;
-
-    if (!keyword) {
-        return res.status(400).json({ error: 'Keyword is required' });
+    try {
+        const movieCheck = await pgPool.query("SELECT id FROM movies WHERE id = $1", [movieId]);
+        if (movieCheck.rows.length === 0) {
+            return res.status(404).json({ error: `Movie with ID ${movieId} not found` });
+        }
+        const viewerCheck = await pgPool.query("SELECT id FROM viewers WHERE id = $1", [viewerId]);
+        if (viewerCheck.rows.length === 0) {
+            return res.status(404).json({ error: `Viewer with ID ${viewerId} not found` });
+        }
+        const result = await pgPool.query(
+            `INSERT INTO reviews (viewer_id, stars, review_text, movie_id)
+             VALUES ($1, $2, $3, $4) RETURNING *`,
+            [viewerId, stars, reviewText, movieId]
+        );
+        res.status(201).json({
+            message: `Review added for movie ID: ${movieId} by viewer ID: ${viewerId}`,
+            review: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Error adding review:', error);
+        res.status(500).json({ error: 'Failed to add review' });
     }
-
-    // Hae elokuvat avainsanan perusteella logiikka tähän
-    res.status(200).json({ message: `Movies matching keyword '${keyword}' fetched` });
 });
-
+// Get all movies 
+app.get('/movies', async (req, res) => {
+    try {
+        const result = await pgPool.query('SELECT * FROM movies');
+        res.status(200).json({
+            movies: result.rows
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch movies' });
+    }
+});
 // Get favorite movies by username
-app.get('/favorites/:username', (req, res) => {
+app.get('/favorites/:username', async (req, res) => {
     const { username } = req.params;
 
-    // Hae käyttäjän suosikit logiikka tähän
-    res.status(200).json({ message: `Favorites for user '${username}' fetched` });
+    if (!username) {
+        return res.status(400).json({ error: 'Username is required' });
+    }
+
+    try {
+        const result = await pgPool.query(
+            `SELECT m.* 
+             FROM movies m
+             JOIN favorites f ON f.movie_id = m.id
+             JOIN viewers v ON f.viewer_id = v.id
+             WHERE v.user_name = $1`,
+            [username]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: `No favorite movies found for user '${username}'` });
+        }
+        res.status(200).json({ favoriteMovies: result.rows });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch favorite movies' });
+    }
 });
 
 // Get movie by id
-app.get('/movies/:id', (req, res) => {
+app.get('/movies/:id', async (req, res) => {
     const { id } = req.params;
 
-    // Hae elokuvan id perusteella logiikka tähän
-    res.status(200).json({ message: `Movie with ID: ${id} fetched` });
+    if (!id) {
+        return res.status(400).json({ error: 'Movie ID is required' });
+    }
+    try {
+        const result = await pgPool.query(
+            `SELECT * FROM movies WHERE id = $1`,
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: `Movie with ID: ${id} not found` });
+        }
+        res.status(200).json({ movie: result.rows[0] });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch movie' });
+    }
 });
 
 // Delete movie by id
-app.delete('/movies/:id', (req, res) => {
+app.delete('/movies/:id', async (req, res) => {
     const { id } = req.params;
-
-    // Poista elokuvan id perusteella logiikka tähän
-    res.status(200).json({ message: `Movie with ID: ${id} deleted` });
+    try {
+        await pgPool.query(`DELETE FROM reviews WHERE movie_id = $1`, [id]);
+        const result = await pgPool.query(`DELETE FROM movies WHERE id = $1 RETURNING *`, [id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: `Movie with ID: ${id} not found` });
+        }
+        res.status(200).json({ message: `Movie with ID: ${id} deleted successfully` });
+    } catch (error) {
+        console.error('Error deleting movie:', error);
+        res.status(500).json({ error: 'Failed to delete movie' });
+    }
 });
