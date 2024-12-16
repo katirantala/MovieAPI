@@ -11,8 +11,4 @@ const pgPool = new pg.Pool({
     password: process.env.PG_PASSWORD
 });
 
-pgPool.query('SELECT NOW()')
-    .then((res) => console.log('Database connection test successful:', res.rows))
-    .catch((err) => console.error('Database connection error:', err.stack));
-
 export default pgPool;
